@@ -1143,8 +1143,13 @@ function updateSession(sessionId, state, event, opts = {}) {
   // Sticky: empty input does not clear an existing title. A session that has
   // ever been named keeps that name until the user explicitly renames it.
   const srcSessionTitle = normalizeTitle(sessionTitle) || (existing && existing.sessionTitle) || null;
-  const srcAssistantLastOutput = normalizeAssistantOutput(assistantLastOutput);
-  const srcAssistantLastOutputTruncated = !!(srcAssistantLastOutput && assistantLastOutputTruncated === true);
+  const normalizedAssistantLastOutput = normalizeAssistantOutput(assistantLastOutput);
+  const srcAssistantLastOutput = normalizedAssistantLastOutput || (existing && existing.assistantLastOutput) || null;
+  const srcAssistantLastOutputTruncated = !!(srcAssistantLastOutput && (
+    normalizedAssistantLastOutput
+      ? assistantLastOutputTruncated === true
+      : existing && existing.assistantLastOutputTruncated === true
+  ));
   const srcResumeState = (existing && existing.resumeState) || null;
   const isSubagentStart = event === "SubagentStart" || event === "subagentStart";
   const isSubagentStop = event === "SubagentStop" || event === "subagentStop";

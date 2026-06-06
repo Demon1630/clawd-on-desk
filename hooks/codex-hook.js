@@ -341,12 +341,10 @@ function buildStateBody(payload, resolve) {
   if (payload.stop_hook_active === true || payload.stop_hook_active === false) {
     body.stop_hook_active = payload.stop_hook_active;
   }
-  if (event === "Stop") {
-    const assistantOutput = extractLastAssistantTextFromTranscript(payload.transcript_path);
-    if (assistantOutput && assistantOutput.text) {
-      body.assistant_last_output = assistantOutput.text;
-      if (assistantOutput.truncated) body.assistant_last_output_truncated = true;
-    }
+  const assistantOutput = extractLastAssistantTextFromTranscript(payload.transcript_path);
+  if (assistantOutput && assistantOutput.text) {
+    body.assistant_last_output = assistantOutput.text;
+    if (assistantOutput.truncated) body.assistant_last_output_truncated = true;
   }
 
   const sessionMeta = readFirstSessionMeta(payload.transcript_path);

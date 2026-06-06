@@ -108,6 +108,9 @@ function handleStatePost(req, res, options) {
       const codexSource = typeof data.codex_source === "string" && data.codex_source.trim()
         ? data.codex_source.trim()
         : null;
+      const transcriptPath = typeof data.transcript_path === "string" && data.transcript_path.trim()
+        ? data.transcript_path.trim()
+        : null;
       const ghosttyTerminalId = typeof data.ghostty_terminal_id === "string" && data.ghostty_terminal_id.trim()
         ? data.ghostty_terminal_id.trim()
         : null;
@@ -233,7 +236,7 @@ function handleStatePost(req, res, options) {
             codexOriginator,
             codexSource,
             ghosttyTerminalId,
-            transcriptPath: typeof transcript_path === "string" ? transcript_path : null,
+            transcriptPath,
             displayHint: display_svg,
             sessionTitle,
             assistantLastOutput,
