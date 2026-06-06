@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self'; style-src 'self'; img-src 'self' file:; media-src 'self';">
+  <link rel="stylesheet" href="styles.css">
+  <title>Clawd</title>
+</head>
+<body>
+  <div id="pet-clip">
+    <div id="pet-container">
+      <object id="clawd" type="image/svg+xml"></object>
+    </div>
+    <div id="codex-quota-badge" aria-live="polite" aria-atomic="true" title="Codex quota status">
+      <span id="codex-quota-dot" aria-hidden="true"></span>
+      <span id="codex-quota-text">
+        <span id="codex-quota-primary">Codex --</span>
+        <span id="codex-quota-secondary">&#26412;&#21608; --</span>
+      </span>
+    </div>
+  </div>
+  <div id="codex-step-card" aria-live="polite" aria-atomic="true" hidden>
+    <div class="codex-step-head">
+      <span id="codex-step-title"></span>
+      <span id="codex-step-state"><span class="dot" aria-hidden="true"></span><span class="label"></span></span>
+    </div>
+    <div id="codex-step-body"></div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
