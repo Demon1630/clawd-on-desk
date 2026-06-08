@@ -29,14 +29,14 @@ let quotaRefreshInFlight = null;
 let petStepRefreshTimer = null;
 let petStepRefreshInFlight = null;
 let petStepRefreshToken = 0;
-const QUOTA_FAST_WARNING_DELTA = 10;
+const QUOTA_PACE_WARNING_DELTA = 1;
 
 function clampPercent(value) {
   if (!Number.isFinite(value)) return null;
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function computeQuotaFastWarning(window) {
+function computeQuotaPaceWarning(window) {
   if (!window || !window.resetsAt || !Number.isFinite(window.windowDurationMins)) return null;
   const resetAt = new Date(window.resetsAt);
   const resetMs = resetAt.getTime();
@@ -49,9 +49,10 @@ function computeQuotaFastWarning(window) {
   if (expectedUsed == null || actualUsed == null) return null;
 
   const delta = actualUsed - expectedUsed;
-  if (delta < QUOTA_FAST_WARNING_DELTA) return null;
+  if (Math.abs(delta) < QUOTA_PACE_WARNING_DELTA) return null;
   return {
-    delta,
+    delta: Math.abs(delta),
+    pace: delta > 0 ? "fast" : "slow",
     expectedUsed,
     actualUsed,
   };
@@ -66,8 +67,11 @@ function formatQuotaWindow(label, window, fallbackRemainingPercent, includeReset
     const resetAt = new Date(window.resetsAt);
     if (!Number.isNaN(resetAt.getTime())) parts.push("\u91cd\u7f6e " + resetAt.toLocaleString());
   }
-  const warning = computeQuotaFastWarning(window);
-  if (warning) parts.push(`\u8d85\u524d ${warning.delta} \u4e2a\u767e\u5206\u70b9`);
+  const warning = computeQuotaPaceWarning(window);
+  if (warning) {
+    const label = warning.pace === "fast" ? "\u8d85\u524d" : "\u5c11\u7528";
+    parts.push(`${label} ${warning.delta} \u4e2a\u767e\u5206\u70b9`);
+  }
   return parts.join(" · ");
 }
 
@@ -96,8 +100,8 @@ function renderQuotaBadge(quota) {
   quotaBadgeEl.dataset.state = state;
   quotaPrimaryEl.textContent = formatQuotaWindow("\u0035\u5c0f\u65f6", primary, remaining);
   quotaSecondaryEl.textContent = formatQuotaWindow("\u672c\u5468", secondary);
-  quotaPrimaryEl.dataset.fast = computeQuotaFastWarning(primary) ? "true" : "false";
-  quotaSecondaryEl.dataset.fast = computeQuotaFastWarning(secondary) ? "true" : "false";
+  quotaPrimaryEl.dataset.pace = (computeQuotaPaceWarning(primary) || {}).pace || "normal";
+  quotaSecondaryEl.dataset.pace = (computeQuotaPaceWarning(secondary) || {}).pace || "normal";
   quotaBadgeEl.title = status ? formatQuotaTitle(status) : (quota && quota.message ? quota.message : "Codex quota status unavailable");
 }
 
