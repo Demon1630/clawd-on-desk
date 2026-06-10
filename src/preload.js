@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onPreloadSounds: (cb) => ipcRenderer.on("preload-sounds", (_, payload) => cb(payload)),
   onPlaySound: (cb) => ipcRenderer.on("play-sound", (_, payload) => cb(payload)),
   onInvalidateSoundCache: (cb) => ipcRenderer.on("invalidate-sound-cache", (_, url) => cb(url)),
+  onReminderSign: (cb) => ipcRenderer.on("reminder-sign", (_, payload) => cb(payload)),
   getCodexQuota: () => ipcRenderer.invoke("codex-quota:get"),
   getCodexLiveAssistantOutput: (transcriptPath) => ipcRenderer.invoke("codex-assistant-output:get", transcriptPath),
   getSessionSnapshot: () => ipcRenderer.invoke("dashboard:get-snapshot"),

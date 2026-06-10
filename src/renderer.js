@@ -13,6 +13,9 @@ const petStepCardEl = document.getElementById("codex-step-card");
 const petStepTitleEl = document.getElementById("codex-step-title");
 const petStepBodyEl = document.getElementById("codex-step-body");
 const petStepStateEl = document.getElementById("codex-step-state");
+const reminderSignEl = document.getElementById("reminder-sign");
+const reminderSignTitleEl = document.getElementById("reminder-sign-title");
+const reminderSignNoteEl = document.getElementById("reminder-sign-note");
 let pendingNext = null;
 const LOW_POWER_IDLE_PAUSE_MS = 5000;
 const SWAP_LOAD_FALLBACK_MS = 3000;
@@ -29,7 +32,43 @@ let quotaRefreshInFlight = null;
 let petStepRefreshTimer = null;
 let petStepRefreshInFlight = null;
 let petStepRefreshToken = 0;
+let reminderSignTimer = null;
+let reminderSignQueue = [];
 const QUOTA_PACE_WARNING_DELTA = 1;
+
+function normalizeReminderSignText(value, maxLength) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!Number.isFinite(maxLength) || text.length <= maxLength) return text;
+  return text.slice(0, Math.max(0, maxLength - 1)).trimEnd() + "…";
+}
+
+function renderReminderSign(payload) {
+  if (!reminderSignEl || !reminderSignTitleEl || !reminderSignNoteEl) return;
+  const title = normalizeReminderSignText(payload && payload.title, 48) || "提醒";
+  const note = normalizeReminderSignText(payload && payload.note, 64);
+  reminderSignTitleEl.textContent = title;
+  reminderSignNoteEl.textContent = note;
+  reminderSignEl.hidden = false;
+  if (reminderSignTimer) clearTimeout(reminderSignTimer);
+  const durationMs = Math.max(3500, Math.min(12000, Number(payload && payload.durationMs) || 7000));
+  reminderSignTimer = setTimeout(() => {
+    reminderSignTimer = null;
+    reminderSignEl.hidden = true;
+    if (reminderSignQueue.length > 0) {
+      const next = reminderSignQueue.shift();
+      setTimeout(() => renderReminderSign(next), 160);
+    }
+  }, durationMs);
+}
+
+function showReminderSign(payload) {
+  if (reminderSignTimer) {
+    reminderSignQueue.push(payload || {});
+    if (reminderSignQueue.length > 3) reminderSignQueue = reminderSignQueue.slice(-3);
+    return;
+  }
+  renderReminderSign(payload || {});
+}
 
 function clampPercent(value) {
   if (!Number.isFinite(value)) return null;
@@ -1498,6 +1537,9 @@ window.electronAPI.onPlaySound((payload) => {
 window.electronAPI.onInvalidateSoundCache((url) => {
   if (typeof url === "string" && url) delete _audioCache[url];
 });
+if (window.electronAPI && typeof window.electronAPI.onReminderSign === "function") {
+  window.electronAPI.onReminderSign((payload) => showReminderSign(payload));
+}
 
 startQuotaPolling();
 startPetStepPolling();

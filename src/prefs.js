@@ -38,7 +38,7 @@ const {
 } = require("./bubble-policy");
 const { normalizeSessionAliases } = require("./session-alias");
 
-const CURRENT_VERSION = 8;
+const CURRENT_VERSION = 11;
 
 // ── Schema ──
 // Each field has: type, default OR defaultFactory, optional enum/normalize/validate.
@@ -215,6 +215,32 @@ const SCHEMA = {
     type: "object",
     defaultFactory: () => ({}),
     normalize: normalizeSessionAliases,
+  },
+  reminders: {
+    type: "object",
+    defaultFactory: () => ({}),
+    normalize: normalizeReminders,
+  },
+  appleCalendarSyncEnabled: { type: "boolean", default: false },
+  appleCalendarSyncIntervalMinutes: {
+    type: "number",
+    default: 15,
+    validate: (v) => Number.isInteger(v) && v >= 5 && v <= 240,
+  },
+  appleCalendarSyncWindowDays: {
+    type: "number",
+    default: 7,
+    validate: (v) => Number.isInteger(v) && v >= 1 && v <= 30,
+  },
+  appleCalendarSyncAllCalendars: { type: "boolean", default: false },
+  appleCalendarTargetCalendarId: { type: "string", default: "" },
+  appleCalendarTargetCalendarName: { type: "string", default: "" },
+  appleCalendarLastSyncAt: { type: "number", default: 0, validate: (v) => Number.isFinite(v) && v >= 0 },
+  appleCalendarLastSyncError: { type: "string", default: "" },
+  appleCalendarDeletionTombstones: {
+    type: "object",
+    defaultFactory: () => ({}),
+    normalize: normalizeAppleCalendarDeletionTombstones,
   },
   // Remote SSH (Phase 2 plan-remote-ssh-one-click v7). Stores user-defined
   // SSH tunnel profiles. The runtime is owned by `remote-ssh-runtime.js` —
@@ -469,6 +495,19 @@ function migrate(raw) {
     }
     out.version = 8;
   }
+  // v8 -> v9: reminders storage. No data conversion needed; the new field
+  // defaults to an empty object via schema validation.
+  if (out.version < 9) {
+    out.version = 9;
+  }
+  // v9 -> v10: Apple Calendar sync settings. No data conversion needed.
+  if (out.version < 10) {
+    out.version = 10;
+  }
+  // v10 -> v11: Apple Calendar deletion tombstones. No data conversion needed.
+  if (out.version < 11) {
+    out.version = 11;
+  }
   if ((typeof out.version === "number" ? out.version : 0) < CURRENT_VERSION) {
     out.version = CURRENT_VERSION;
   }
@@ -484,6 +523,87 @@ function normalizeDismissedUpdateVersions(value) {
   const out = {};
   for (const key of Object.keys(value)) {
     if (typeof key === "string" && key && value[key] === true) out[key] = true;
+  }
+  return out;
+}
+
+function normalizeReminderId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeReminderEntry(value, fallbackId) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = normalizeReminderId(value.id) || normalizeReminderId(fallbackId);
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const dueAt = Number(value.dueAt);
+  const createdAt = Number(value.createdAt);
+  const updatedAt = Number(value.updatedAt);
+  if (!id || !title || !Number.isFinite(dueAt) || dueAt <= 0) return null;
+  const out = {
+    id,
+    title,
+    dueAt,
+    createdAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : dueAt,
+    updatedAt: Number.isFinite(updatedAt) && updatedAt > 0
+      ? updatedAt
+      : (Number.isFinite(createdAt) && createdAt > 0 ? createdAt : dueAt),
+    done: value.done === true,
+  };
+  const note = typeof value.note === "string" ? value.note.trim() : "";
+  if (note) out.note = note;
+  const notifiedAt = Number(value.notifiedAt);
+  if (Number.isFinite(notifiedAt) && notifiedAt > 0) out.notifiedAt = notifiedAt;
+  const source = typeof value.source === "string" ? value.source.trim() : "";
+  if (source) out.source = source.slice(0, 64);
+  const sourceUid = typeof value.sourceUid === "string" ? value.sourceUid.trim() : "";
+  if (sourceUid) out.sourceUid = sourceUid.slice(0, 256);
+  const sourceCalendarId = typeof value.sourceCalendarId === "string" ? value.sourceCalendarId.trim() : "";
+  if (sourceCalendarId) out.sourceCalendarId = sourceCalendarId.slice(0, 256);
+  const sourceCalendarName = typeof value.sourceCalendarName === "string" ? value.sourceCalendarName.trim() : "";
+  if (sourceCalendarName) out.sourceCalendarName = sourceCalendarName.slice(0, 128);
+  const sourceRemoteEtag = typeof value.sourceRemoteEtag === "string" ? value.sourceRemoteEtag.trim() : "";
+  if (sourceRemoteEtag) out.sourceRemoteEtag = sourceRemoteEtag.slice(0, 256);
+  const sourceRemoteHref = typeof value.sourceRemoteHref === "string" ? value.sourceRemoteHref.trim() : "";
+  if (sourceRemoteHref) out.sourceRemoteHref = sourceRemoteHref.slice(0, 512);
+  const sourceFingerprint = typeof value.sourceFingerprint === "string" ? value.sourceFingerprint.trim() : "";
+  if (sourceFingerprint) out.sourceFingerprint = sourceFingerprint.slice(0, 512);
+  const sourceRemoteModifiedAt = Number(value.sourceRemoteModifiedAt);
+  if (Number.isFinite(sourceRemoteModifiedAt) && sourceRemoteModifiedAt > 0) {
+    out.sourceRemoteModifiedAt = sourceRemoteModifiedAt;
+  }
+  const lastSyncedAt = Number(value.lastSyncedAt);
+  if (Number.isFinite(lastSyncedAt) && lastSyncedAt > 0) out.lastSyncedAt = lastSyncedAt;
+  return out;
+}
+
+function normalizeReminders(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const entry = normalizeReminderEntry(value[key], key);
+    if (entry) out[entry.id] = entry;
+  }
+  return out;
+}
+
+function normalizeAppleCalendarDeletionTombstones(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const item = value[key];
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const uid = typeof item.uid === "string" ? item.uid.trim() : "";
+    const calendarId = typeof item.calendarId === "string" ? item.calendarId.trim() : "";
+    const deletedAt = Number(item.deletedAt);
+    if (!uid || !calendarId || !Number.isFinite(deletedAt) || deletedAt <= 0) continue;
+    out[key.slice(0, 640)] = {
+      uid: uid.slice(0, 256),
+      calendarId: calendarId.slice(0, 256),
+      calendarHref: typeof item.calendarHref === "string" ? item.calendarHref.trim().slice(0, 512) : "",
+      remoteHref: typeof item.remoteHref === "string" ? item.remoteHref.trim().slice(0, 512) : "",
+      reminderId: typeof item.reminderId === "string" ? item.reminderId.trim().slice(0, 128) : "",
+      deletedAt,
+    };
   }
   return out;
 }

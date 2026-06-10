@@ -49,6 +49,7 @@
 // keep validate side-effect-free.
 
 const { CURRENT_VERSION } = require("./prefs");
+const crypto = require("crypto");
 const { isValidDisplaySnapshot } = require("./work-area");
 const {
   MAX_AUTO_CLOSE_SECONDS,
@@ -252,6 +253,18 @@ const updateRegistry = {
   disableMiniMode: requireBoolean("disableMiniMode"),
   keepSizeAcrossDisplays: requireBoolean("keepSizeAcrossDisplays"),
   mobilePreviewEnabled: requireBoolean("mobilePreviewEnabled"),
+  appleCalendarSyncEnabled: requireBoolean("appleCalendarSyncEnabled"),
+  appleCalendarSyncIntervalMinutes: requireIntegerInRange("appleCalendarSyncIntervalMinutes", 5, 240),
+  appleCalendarSyncWindowDays: requireIntegerInRange("appleCalendarSyncWindowDays", 1, 30),
+  appleCalendarSyncAllCalendars: requireBoolean("appleCalendarSyncAllCalendars"),
+  appleCalendarTargetCalendarId: requireString("appleCalendarTargetCalendarId", { allowEmpty: true }),
+  appleCalendarTargetCalendarName: requireString("appleCalendarTargetCalendarName", { allowEmpty: true }),
+  appleCalendarLastSyncAt: requireNonNegativeFiniteNumber("appleCalendarLastSyncAt"),
+  appleCalendarLastSyncError: requireString("appleCalendarLastSyncError", { allowEmpty: true }),
+  appleCalendarDeletionTombstones: requirePlainObject("appleCalendarDeletionTombstones"),
+  reminders(value) {
+    return validateRemindersMap(value);
+  },
 
   // ── System-backed prefs (object-form: validate + effect pre-commit gate) ──
   autoStartWithClaude,
@@ -536,6 +549,131 @@ function sessionAliasMapEqual(a, b) {
   return true;
 }
 
+function normalizeReminderId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function reminderNow(deps) {
+  const now = deps && typeof deps.now === "function" ? deps.now() : deps && deps.now;
+  return Number.isFinite(Number(now)) && Number(now) > 0 ? Number(now) : Date.now();
+}
+
+function normalizeReminderEntry(value, fallbackId) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = normalizeReminderId(value.id) || normalizeReminderId(fallbackId);
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const dueAt = Number(value.dueAt);
+  const createdAt = Number(value.createdAt);
+  const updatedAt = Number(value.updatedAt);
+  if (!id || !title || !Number.isFinite(dueAt) || dueAt <= 0) return null;
+  const out = {
+    id,
+    title,
+    dueAt,
+    createdAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : dueAt,
+    updatedAt: Number.isFinite(updatedAt) && updatedAt > 0
+      ? updatedAt
+      : (Number.isFinite(createdAt) && createdAt > 0 ? createdAt : dueAt),
+    done: value.done === true,
+  };
+  const note = typeof value.note === "string" ? value.note.trim() : "";
+  if (note) out.note = note;
+  const notifiedAt = Number(value.notifiedAt);
+  if (Number.isFinite(notifiedAt) && notifiedAt > 0) out.notifiedAt = notifiedAt;
+  const source = typeof value.source === "string" ? value.source.trim() : "";
+  if (source) out.source = source.slice(0, 64);
+  const sourceUid = typeof value.sourceUid === "string" ? value.sourceUid.trim() : "";
+  if (sourceUid) out.sourceUid = sourceUid.slice(0, 256);
+  const sourceCalendarId = typeof value.sourceCalendarId === "string" ? value.sourceCalendarId.trim() : "";
+  if (sourceCalendarId) out.sourceCalendarId = sourceCalendarId.slice(0, 256);
+  const sourceCalendarName = typeof value.sourceCalendarName === "string" ? value.sourceCalendarName.trim() : "";
+  if (sourceCalendarName) out.sourceCalendarName = sourceCalendarName.slice(0, 128);
+  const sourceRemoteEtag = typeof value.sourceRemoteEtag === "string" ? value.sourceRemoteEtag.trim() : "";
+  if (sourceRemoteEtag) out.sourceRemoteEtag = sourceRemoteEtag.slice(0, 256);
+  const sourceRemoteHref = typeof value.sourceRemoteHref === "string" ? value.sourceRemoteHref.trim() : "";
+  if (sourceRemoteHref) out.sourceRemoteHref = sourceRemoteHref.slice(0, 512);
+  const sourceFingerprint = typeof value.sourceFingerprint === "string" ? value.sourceFingerprint.trim() : "";
+  if (sourceFingerprint) out.sourceFingerprint = sourceFingerprint.slice(0, 512);
+  const sourceRemoteModifiedAt = Number(value.sourceRemoteModifiedAt);
+  if (Number.isFinite(sourceRemoteModifiedAt) && sourceRemoteModifiedAt > 0) {
+    out.sourceRemoteModifiedAt = sourceRemoteModifiedAt;
+  }
+  const lastSyncedAt = Number(value.lastSyncedAt);
+  if (Number.isFinite(lastSyncedAt) && lastSyncedAt > 0) out.lastSyncedAt = lastSyncedAt;
+  return out;
+}
+
+function normalizeReminderMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const key of Object.keys(value)) {
+    const entry = normalizeReminderEntry(value[key], key);
+    if (entry) out[entry.id] = entry;
+  }
+  return out;
+}
+
+function reminderMapsEqual(a, b) {
+  const aKeys = Object.keys(a || {});
+  const bKeys = Object.keys(b || {});
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    const av = a[key];
+    const bv = b[key];
+    if (!bv) return false;
+    if (
+      av.id !== bv.id
+      || av.title !== bv.title
+      || av.dueAt !== bv.dueAt
+      || av.createdAt !== bv.createdAt
+      || (av.updatedAt || av.createdAt || 0) !== (bv.updatedAt || bv.createdAt || 0)
+      || av.done !== bv.done
+      || (av.note || "") !== (bv.note || "")
+      || (av.notifiedAt || null) !== (bv.notifiedAt || null)
+      || (av.source || "") !== (bv.source || "")
+      || (av.sourceUid || "") !== (bv.sourceUid || "")
+      || (av.sourceCalendarId || "") !== (bv.sourceCalendarId || "")
+      || (av.sourceCalendarName || "") !== (bv.sourceCalendarName || "")
+      || (av.sourceRemoteEtag || "") !== (bv.sourceRemoteEtag || "")
+      || (av.sourceRemoteHref || "") !== (bv.sourceRemoteHref || "")
+      || (av.sourceFingerprint || "") !== (bv.sourceFingerprint || "")
+      || (av.sourceRemoteModifiedAt || null) !== (bv.sourceRemoteModifiedAt || null)
+      || (av.lastSyncedAt || null) !== (bv.lastSyncedAt || null)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function validateRemindersMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { status: "error", message: "reminders must be an object map" };
+  }
+  const normalized = normalizeReminderMap(value);
+  for (const key of Object.keys(value)) {
+    const entry = normalizeReminderEntry(value[key], key);
+    if (!entry) {
+      return { status: "error", message: `reminders[${key}] is invalid` };
+    }
+  }
+  return { status: "ok", normalized };
+}
+
+function snapshotReminders(deps) {
+  const snapshot = (deps && deps.snapshot) || {};
+  return normalizeReminderMap(snapshot.reminders || {});
+}
+
+function buildReminderId(payload) {
+  const supplied = payload && typeof payload === "object" ? normalizeReminderId(payload.id) : "";
+  if (supplied) return supplied;
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
+  return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 function getCommandNow(deps) {
   const now = deps && typeof deps.now === "function" ? deps.now() : deps && deps.now;
   return Number.isFinite(Number(now)) && Number(now) > 0 ? Number(now) : Date.now();
@@ -587,6 +725,253 @@ function setSessionAlias(payload, deps) {
     return { status: "ok", noop: true };
   }
   return { status: "ok", commit: { sessionAliases: prunedAliases } };
+}
+
+function normalizeReminderPayloadValue(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : null;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
+function reminderAdd(payload, deps = {}) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "reminders.add: payload must be an object" };
+  }
+  const title = typeof payload.title === "string" ? payload.title.trim() : "";
+  if (!title) return { status: "error", message: "reminders.add.title must be a non-empty string" };
+  const dueAt = normalizeReminderPayloadValue(payload.dueAt);
+  if (!dueAt) return { status: "error", message: "reminders.add.dueAt must be a positive number" };
+  const note = typeof payload.note === "string" ? payload.note.trim() : "";
+  const now = reminderNow(deps);
+  const current = snapshotReminders(deps);
+  const id = buildReminderId(payload);
+  if (current[id]) {
+    return { status: "error", message: `reminders.add: reminder id "${id}" already exists` };
+  }
+  const next = { ...current };
+  next[id] = {
+    id,
+    title,
+    dueAt,
+    createdAt: now,
+    updatedAt: now,
+    done: false,
+    ...(note ? { note } : {}),
+  };
+  return { status: "ok", commit: { reminders: next } };
+}
+
+function reminderUpdate(payload, deps = {}) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "reminders.update: payload must be an object" };
+  }
+  const id = normalizeReminderId(payload.id);
+  if (!id) return { status: "error", message: "reminders.update.id must be a non-empty string" };
+  const current = snapshotReminders(deps);
+  const existing = current[id];
+  if (!existing) return { status: "error", message: `reminders.update: reminder "${id}" not found` };
+
+  const next = { ...current };
+  const updated = { ...existing, updatedAt: reminderNow(deps) };
+  if (Object.prototype.hasOwnProperty.call(payload, "title")) {
+    const title = typeof payload.title === "string" ? payload.title.trim() : "";
+    if (!title) return { status: "error", message: "reminders.update.title must be a non-empty string" };
+    updated.title = title;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "dueAt")) {
+    const dueAt = normalizeReminderPayloadValue(payload.dueAt);
+    if (!dueAt) return { status: "error", message: "reminders.update.dueAt must be a positive number" };
+    updated.dueAt = dueAt;
+    delete updated.notifiedAt;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "note")) {
+    const note = typeof payload.note === "string" ? payload.note.trim() : "";
+    if (note) updated.note = note;
+    else delete updated.note;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "done")) {
+    if (typeof payload.done !== "boolean") {
+      return { status: "error", message: "reminders.update.done must be a boolean" };
+    }
+    updated.done = payload.done;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "notifiedAt")) {
+    if (payload.notifiedAt == null) delete updated.notifiedAt;
+    else {
+      const notifiedAt = Number(payload.notifiedAt);
+      if (!Number.isFinite(notifiedAt) || notifiedAt <= 0) {
+        return { status: "error", message: "reminders.update.notifiedAt must be a positive number or null" };
+      }
+      updated.notifiedAt = notifiedAt;
+    }
+  }
+  next[id] = updated;
+  if (reminderMapsEqual(next, current)) return { status: "ok", noop: true };
+  return { status: "ok", commit: { reminders: next } };
+}
+
+function reminderDelete(payload, deps = {}) {
+  const id = typeof payload === "string"
+    ? normalizeReminderId(payload)
+    : normalizeReminderId(payload && payload.id);
+  if (!id) return { status: "error", message: "reminders.delete.id must be a non-empty string" };
+  const current = snapshotReminders(deps);
+  const existing = current[id];
+  if (!existing) return { status: "ok", noop: true };
+  const next = { ...current };
+  delete next[id];
+  const commit = { reminders: next };
+  if (existing.source === "apple-calendar" && existing.sourceUid && existing.sourceCalendarId) {
+    const snapshot = (deps && deps.snapshot) || {};
+    const tombstones = snapshot.appleCalendarDeletionTombstones
+      && typeof snapshot.appleCalendarDeletionTombstones === "object"
+      && !Array.isArray(snapshot.appleCalendarDeletionTombstones)
+      ? { ...snapshot.appleCalendarDeletionTombstones }
+      : {};
+    const key = `${existing.sourceCalendarId}\u001f${existing.sourceUid}`;
+    tombstones[key] = {
+      uid: existing.sourceUid,
+      calendarId: existing.sourceCalendarId,
+      calendarHref: existing.sourceCalendarId,
+      remoteHref: existing.sourceRemoteHref || "",
+      reminderId: existing.id,
+      deletedAt: reminderNow(deps),
+    };
+    commit.appleCalendarDeletionTombstones = tombstones;
+  }
+  return { status: "ok", commit };
+}
+
+function reminderSetDone(payload, deps = {}) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "reminders.setDone: payload must be an object" };
+  }
+  const id = normalizeReminderId(payload.id);
+  if (!id) return { status: "error", message: "reminders.setDone.id must be a non-empty string" };
+  if (typeof payload.done !== "boolean") {
+    return { status: "error", message: "reminders.setDone.done must be a boolean" };
+  }
+  const current = snapshotReminders(deps);
+  const existing = current[id];
+  if (!existing) return { status: "error", message: `reminders.setDone: reminder "${id}" not found` };
+  if (existing.done === payload.done) return { status: "ok", noop: true };
+  const nextItem = { ...existing, done: payload.done };
+  nextItem.updatedAt = reminderNow(deps);
+  if (payload.done === false) delete nextItem.notifiedAt;
+  const next = { ...current, [id]: nextItem };
+  return { status: "ok", commit: { reminders: next } };
+}
+
+function reminderSnooze(payload, deps = {}) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "reminders.snooze: payload must be an object" };
+  }
+  const id = normalizeReminderId(payload.id);
+  if (!id) return { status: "error", message: "reminders.snooze.id must be a non-empty string" };
+  const minutes = Number(payload.minutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return { status: "error", message: "reminders.snooze.minutes must be a positive number" };
+  }
+  const current = snapshotReminders(deps);
+  const existing = current[id];
+  if (!existing) return { status: "error", message: `reminders.snooze: reminder "${id}" not found` };
+  const now = reminderNow(deps);
+  const next = {
+    ...current,
+    [id]: {
+      ...existing,
+      updatedAt: now,
+      dueAt: now + Math.round(minutes * 60_000),
+      done: false,
+      notifiedAt: null,
+    },
+  };
+  return { status: "ok", commit: { reminders: next } };
+}
+
+function appleCalendarNormalizeCredentialText(value, field) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) {
+    return { status: "error", message: `appleCalendar.${field} must be a non-empty string` };
+  }
+  return { status: "ok", value: text };
+}
+
+async function appleCalendarSetCredentials(payload, deps = {}) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "appleCalendar.setCredentials: payload must be an object" };
+  }
+  if (!deps || typeof deps.writeAppleCalendarCredentials !== "function") {
+    return { status: "error", message: "appleCalendar.setCredentials requires writeAppleCalendarCredentials dep" };
+  }
+  const appleIdResult = appleCalendarNormalizeCredentialText(payload.appleId, "appleId");
+  if (appleIdResult.status !== "ok") return appleIdResult;
+  const passwordResult = appleCalendarNormalizeCredentialText(payload.appPassword, "appPassword");
+  if (passwordResult.status !== "ok") return passwordResult;
+  try {
+    await deps.writeAppleCalendarCredentials({
+      appleId: appleIdResult.value,
+      appPassword: passwordResult.value,
+    });
+    if (typeof deps.syncAppleCalendarNow === "function") {
+      try { await deps.syncAppleCalendarNow({ reason: "credentials" }); } catch {}
+    }
+    return { status: "ok" };
+  } catch (err) {
+    return { status: "error", message: `appleCalendar.setCredentials: ${err && err.message}` };
+  }
+}
+
+async function appleCalendarClearCredentials(_payload, deps = {}) {
+  if (!deps || typeof deps.clearAppleCalendarCredentials !== "function") {
+    return { status: "error", message: "appleCalendar.clearCredentials requires clearAppleCalendarCredentials dep" };
+  }
+  try {
+    await deps.clearAppleCalendarCredentials();
+    return { status: "ok" };
+  } catch (err) {
+    return { status: "error", message: `appleCalendar.clearCredentials: ${err && err.message}` };
+  }
+}
+
+async function appleCalendarStatus(_payload, deps = {}) {
+  if (!deps || typeof deps.getAppleCalendarStatus !== "function") {
+    return { status: "error", message: "appleCalendar.status requires getAppleCalendarStatus dep" };
+  }
+  try {
+    const result = await deps.getAppleCalendarStatus();
+    return { status: "ok", ...(result || {}) };
+  } catch (err) {
+    return { status: "error", message: `appleCalendar.status: ${err && err.message}` };
+  }
+}
+
+async function appleCalendarListCalendars(_payload, deps = {}) {
+  if (!deps || typeof deps.listAppleCalendarCalendars !== "function") {
+    return { status: "error", message: "appleCalendar.listCalendars requires listAppleCalendarCalendars dep" };
+  }
+  try {
+    const result = await deps.listAppleCalendarCalendars();
+    return { status: "ok", calendars: Array.isArray(result && result.calendars) ? result.calendars : [], ...(result || {}) };
+  } catch (err) {
+    return { status: "error", message: `appleCalendar.listCalendars: ${err && err.message}` };
+  }
+}
+
+async function appleCalendarSyncNow(payload, deps = {}) {
+  if (!deps || typeof deps.syncAppleCalendarNow !== "function") {
+    return { status: "error", message: "appleCalendar.syncNow requires syncAppleCalendarNow dep" };
+  }
+  try {
+    const result = await deps.syncAppleCalendarNow(payload || {});
+    return result && result.status ? result : { status: "ok", ...(result || {}) };
+  } catch (err) {
+    return { status: "error", message: `appleCalendar.syncNow: ${err && err.message}` };
+  }
 }
 
 const _validateRemoveThemeId = requireString("removeTheme.themeId");
@@ -1121,6 +1506,16 @@ remoteSshMarkRemoteNode.lockKey = "remoteSsh";
 telegramApprovalSetToken.lockKey = "tgApproval";
 telegramApprovalSendTest.lockKey = "tgApproval";
 cleanupIntegrationsCommand.lockKey = "agentIntegrationCleanup";
+reminderAdd.lockKey = "reminders";
+reminderUpdate.lockKey = "reminders";
+reminderDelete.lockKey = "reminders";
+reminderSetDone.lockKey = "reminders";
+reminderSnooze.lockKey = "reminders";
+appleCalendarSetCredentials.lockKey = "appleCalendar";
+appleCalendarClearCredentials.lockKey = "appleCalendar";
+appleCalendarStatus.lockKey = "appleCalendar";
+appleCalendarListCalendars.lockKey = "appleCalendar";
+appleCalendarSyncNow.lockKey = "appleCalendar";
 
 const repairDoctorIssue = createRepairDoctorIssue({
   repairAgentIntegration,
@@ -1157,6 +1552,16 @@ const commandRegistry = {
   "remoteSsh.delete": remoteSshDeleteProfile,
   "remoteSsh.markDeployed": remoteSshMarkDeployed,
   "remoteSsh.markRemoteNode": remoteSshMarkRemoteNode,
+  "reminders.add": reminderAdd,
+  "reminders.update": reminderUpdate,
+  "reminders.delete": reminderDelete,
+  "reminders.setDone": reminderSetDone,
+  "reminders.snooze": reminderSnooze,
+  "appleCalendar.setCredentials": appleCalendarSetCredentials,
+  "appleCalendar.clearCredentials": appleCalendarClearCredentials,
+  "appleCalendar.status": appleCalendarStatus,
+  "appleCalendar.listCalendars": appleCalendarListCalendars,
+  "appleCalendar.syncNow": appleCalendarSyncNow,
   "telegramApproval.setToken": telegramApprovalSetToken,
   "telegramApproval.deleteTokenFile": telegramApprovalDeleteTokenFile,
   "telegramApproval.status": telegramApprovalStatus,

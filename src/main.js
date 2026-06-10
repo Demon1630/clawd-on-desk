@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow, screen, ipcMain, globalShortcut, nativeTheme, dialog, shell, nativeImage, powerSaveBlocker, clipboard } = require("electron");
+const { app, BrowserWindow, screen, ipcMain, globalShortcut, nativeTheme, dialog, shell, nativeImage, powerSaveBlocker, clipboard, Notification, safeStorage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { EventEmitter } = require("events");
@@ -50,6 +50,9 @@ const createTopmostRuntime = require("./topmost-runtime");
 const { WIN_TOPMOST_LEVEL } = createTopmostRuntime;
 const createThemeFadeSequencer = require("./theme-fade-sequencer");
 const createThemeRuntime = require("./theme-runtime");
+const { createReminderRuntime } = require("./reminder-runtime");
+const { createAppleCalendarAuthStore } = require("./apple-calendar-auth-store");
+const { createAppleCalendarSyncRuntime } = require("./apple-calendar-sync");
 const createAgentRuntimeMain = require("./agent-runtime-main");
 const createFloatingWindowRuntime = require("./floating-window-runtime");
 const createPetWindowRuntime = require("./pet-window-runtime");
@@ -150,7 +153,27 @@ const {
 } = require("./bubble-policy");
 const loginItemHelpers = require("./login-item");
 const PREFS_PATH = path.join(app.getPath("userData"), "clawd-prefs.json");
+const APPLE_CALENDAR_AUTH_PATH = path.join(app.getPath("userData"), "apple-calendar-auth.dat");
 const _initialPrefsLoad = prefsModule.load(PREFS_PATH);
+let appleCalendarAuthStore = null;
+try {
+  appleCalendarAuthStore = createAppleCalendarAuthStore({
+    filePath: APPLE_CALENDAR_AUTH_PATH,
+    fs,
+    path,
+    safeStorage,
+  });
+} catch (err) {
+  console.warn("Clawd: Apple Calendar auth store unavailable:", err && err.message);
+  appleCalendarAuthStore = {
+    async getCredentials() { return null; },
+    async hasCredentials() { return false; },
+    async writeCredentials() { throw new Error("Apple Calendar auth store unavailable"); },
+    async deleteCredentials() {},
+    async getMaskedAppleId() { return ""; },
+    async getStoreStatus() { return { configured: false, maskedAppleId: "" }; },
+  };
+}
 
 // Lazy helpers — these run inside the action `effect` callbacks at click time,
 // long after server.js / hooks/install.js are loaded. Wrapping them in closures
@@ -226,6 +249,8 @@ let themeRuntime = null;
 let agentRuntime = null;
 let floatingWindowRuntime = null;
 let codexPetMain = null;
+let reminderRuntime = null;
+let appleCalendarSyncRuntime = null;
 let telegramApprovalSidecar = null;
 let telegramApprovalSyncPromise = Promise.resolve();
 let telegramApprovalConfigSignature = "";
@@ -283,6 +308,15 @@ const _settingsController = createSettingsController({
     getTelegramApprovalTokenInfo: () => getTelegramApprovalTokenInfo(),
     sendTelegramApprovalTest: () => sendTelegramApprovalTest(),
     deleteTelegramApprovalTokenFile: () => deleteTelegramApprovalTokenFile(),
+    writeAppleCalendarCredentials: (creds) => appleCalendarAuthStore.writeCredentials(creds),
+    clearAppleCalendarCredentials: () => appleCalendarAuthStore.deleteCredentials(),
+    getAppleCalendarStatus: () => appleCalendarSyncRuntime ? appleCalendarSyncRuntime.getStatus() : appleCalendarAuthStore.getStoreStatus(),
+    listAppleCalendarCalendars: () => appleCalendarSyncRuntime
+      ? appleCalendarSyncRuntime.listCalendars()
+      : Promise.resolve({ status: "error", message: "Apple Calendar sync is not ready", calendars: [] }),
+    syncAppleCalendarNow: (payload) => appleCalendarSyncRuntime
+      ? appleCalendarSyncRuntime.syncNow(payload)
+      : Promise.resolve({ status: "error", message: "Apple Calendar sync is not ready" }),
     // Lazy getter so settings-actions can use the controller even though it's
     // instantiated below (forward-reference).
     get telegramMigration() {
@@ -395,6 +429,21 @@ function safeConsoleError(...args) {
       fs.appendFileSync(path.join(app.getPath("userData"), "clawd-main.log"), line);
     } catch {}
   }
+}
+
+function appendUserDataLog(filename, prefix, ...args) {
+  const rendered = args.map((value) => {
+    if (typeof value === "string") return value;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }).join(" ");
+  const line = `${new Date().toISOString()} ${prefix} ${rendered}\n`;
+  try {
+    fs.appendFileSync(path.join(app.getPath("userData"), filename), line);
+  } catch {}
 }
 
 // ── Theme loader ──
@@ -2693,6 +2742,26 @@ const settingsEffectRouter = createSettingsEffectRouter({
   logWarn: console.warn,
 });
 settingsEffectRouter.start();
+function showReminderSignOnPet(payload) {
+  if (!win || win.isDestroyed()) return false;
+  sendToRenderer("reminder-sign", payload);
+  return true;
+}
+reminderRuntime = createReminderRuntime({
+  settingsController: _settingsController,
+  Notification,
+  getLang: () => lang,
+  showPetSign: showReminderSignOnPet,
+  log: (...args) => console.warn("Clawd reminders:", ...args),
+});
+appleCalendarSyncRuntime = createAppleCalendarSyncRuntime({
+  settingsController: _settingsController,
+  authStore: appleCalendarAuthStore,
+  log: (...args) => {
+    console.warn("Clawd Apple Calendar:", ...args);
+    appendUserDataLog("apple-calendar-sync.log", "Clawd Apple Calendar:", ...args);
+  },
+});
 _settingsController.subscribeKey("tgApproval", () => {
   if (suppressTelegramApprovalSidecarSync > 0) return;
   queueTelegramApprovalSidecarSync("settings");
@@ -3335,6 +3404,12 @@ if (!gotTheLock) {
 
     // Auto-updater: setup event handlers (user triggers check via tray menu)
     setupAutoUpdater();
+    try { if (reminderRuntime) reminderRuntime.start(); } catch (err) {
+      console.warn("Clawd: reminder runtime start failed:", err && err.message);
+    }
+    try { if (appleCalendarSyncRuntime) appleCalendarSyncRuntime.start(); } catch (err) {
+      console.warn("Clawd: Apple Calendar sync runtime start failed:", err && err.message);
+    }
     // #329: reconcile any stale pending-update entry (e.g. user installed
     // out-of-band on macOS) and start the background scheduler. Both are
     // safe in dev mode — reconcile is a no-op when nothing is pending,
@@ -3345,6 +3420,8 @@ if (!gotTheLock) {
 
   app.on("before-quit", () => {
     isQuitting = true;
+    try { if (reminderRuntime) reminderRuntime.stop(); } catch {}
+    try { if (appleCalendarSyncRuntime) appleCalendarSyncRuntime.stop(); } catch {}
     try { stopUpdateScheduler(); } catch {}
     releasePowerSaveBlocker();
     flushRuntimeStateToPrefs();

@@ -3276,6 +3276,196 @@ html, body {
   font-size: 13px;
   color: var(--text-primary);
 }
+.soft-btn.danger {
+  color: var(--toast-error);
+}
+.soft-btn.danger:hover:not(:disabled) {
+  border-color: var(--toast-error);
+  background: rgba(185, 28, 28, 0.08);
+}
+.reminders-form-card,
+.reminders-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+}
+.reminders-form-title,
+.reminders-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.reminders-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  gap: 10px 12px;
+}
+.reminders-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.reminders-field span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.reminders-field input[type="text"],
+.reminders-field input[type="datetime-local"],
+.reminders-field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 10px;
+}
+.reminders-field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.reminders-field-note {
+  grid-column: 1 / -1;
+}
+.reminders-field input[type="text"]:focus,
+.reminders-field input[type="datetime-local"]:focus,
+.reminders-field textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.apple-calendar-credentials-control,
+.apple-calendar-target-control {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  width: 100%;
+}
+.apple-calendar-refresh-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.apple-calendar-credentials-control input[type="text"],
+.apple-calendar-credentials-control input[type="password"],
+.apple-calendar-target-control select,
+.apple-calendar-refresh-control input[type="number"] {
+  min-width: 180px;
+  flex: 1 1 180px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 10px;
+}
+.apple-calendar-target-control select {
+  flex-basis: 260px;
+}
+.apple-calendar-select-muted {
+  opacity: 0.62;
+}
+.apple-calendar-refresh-unit {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.apple-calendar-status-row .row-desc {
+  max-width: 54ch;
+}
+.apple-calendar-credentials-row,
+.apple-calendar-target-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.apple-calendar-credentials-row .row-text,
+.apple-calendar-target-row .row-text {
+  flex: 1 1 auto;
+  width: 100%;
+}
+.apple-calendar-credentials-row .row-control,
+.apple-calendar-target-row .row-control,
+.apple-calendar-refresh-control,
+.apple-calendar-status-row .row-control {
+  align-items: stretch;
+}
+.apple-calendar-credentials-row .row-control,
+.apple-calendar-target-row .row-control {
+  width: 100%;
+  flex-shrink: 1;
+  justify-content: flex-end;
+}
+.reminders-form-actions,
+.reminders-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.reminders-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.reminders-card-when {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.reminders-card-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.reminders-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.reminders-status.upcoming {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.24);
+}
+.reminders-status.overdue {
+  color: var(--toast-error);
+  background: rgba(185, 28, 28, 0.08);
+  border-color: rgba(185, 28, 28, 0.24);
+}
+.reminders-status.done {
+  color: var(--text-tertiary);
+}
+@media (prefers-color-scheme: dark) {
+  .reminders-status.upcoming { color: #34d399; }
+  .reminders-status.overdue { color: #f87171; }
+}
+.reminders-empty {
+  padding: 20px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .reminders-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .tg-migration-body {
   display: flex;
   flex-direction: column;
