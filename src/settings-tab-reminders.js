@@ -193,20 +193,20 @@
   function refreshAppleStatus({ forceRender = false } = {}) {
     if (view.apple.loading) return Promise.resolve();
     view.apple.loading = true;
-    if (forceRender) ops.requestRender({ content: true });
+    if (forceRender) requestAppleSectionRender();
     return callCommand("appleCalendar.status").then((result) => {
       view.apple.loading = false;
       if (!result || result.status !== "ok") {
         view.apple.status = { configured: false };
         view.apple.calendars = [];
-        if (forceRender) ops.requestRender({ content: true });
+        if (forceRender) requestAppleSectionRender();
         return;
       }
       view.apple.status = result;
       if (result.calendars && Array.isArray(result.calendars)) {
         view.apple.calendars = result.calendars;
       }
-      if (forceRender) ops.requestRender({ content: true });
+      if (forceRender) requestAppleSectionRender();
       if (result.configured) {
         return refreshAppleCalendars({ forceRender: false });
       }
@@ -216,14 +216,14 @@
       view.apple.loading = false;
       view.apple.status = { configured: false };
       view.apple.calendars = [];
-      if (forceRender) ops.requestRender({ content: true });
+      if (forceRender) requestAppleSectionRender();
     });
   }
 
   function refreshAppleCalendars({ forceRender = false } = {}) {
     if (view.apple.calendarsLoading) return Promise.resolve();
     view.apple.calendarsLoading = true;
-    if (forceRender) ops.requestRender({ content: true });
+    if (forceRender) requestAppleSectionRender();
     return callCommand("appleCalendar.listCalendars").then((result) => {
       view.apple.calendarsLoading = false;
       if (result && result.status === "ok" && Array.isArray(result.calendars)) {
@@ -236,10 +236,10 @@
           callUpdate("appleCalendarTargetCalendarName", selected.displayName || "");
         }
       }
-      if (forceRender) ops.requestRender({ content: true });
+      if (forceRender) requestAppleSectionRender();
     }).catch(() => {
       view.apple.calendarsLoading = false;
-      if (forceRender) ops.requestRender({ content: true });
+      if (forceRender) requestAppleSectionRender();
     });
   }
 
@@ -255,11 +255,11 @@
       return Promise.resolve();
     }
     view.apple.savingCredentials = true;
-    ops.requestRender({ content: true });
+    requestAppleSectionRender();
     return callCommand("appleCalendar.setCredentials", { appleId, appPassword }).then((result) => {
       view.apple.savingCredentials = false;
       if (!result || result.status !== "ok") {
-        ops.requestRender({ content: true });
+        requestAppleSectionRender();
         return;
       }
       ops.showToast(t("appleCalendarCredentialsSaved"));
@@ -268,7 +268,7 @@
     }).catch((err) => {
       view.apple.savingCredentials = false;
       ops.showToast((err && err.message) || t("appleCalendarCredentialsSaveFailed"), { error: true });
-      ops.requestRender({ content: true });
+      requestAppleSectionRender();
     });
   }
 
@@ -280,17 +280,17 @@
       view.apple.appPassword = "";
       view.apple.status = { configured: false };
       view.apple.calendars = [];
-      ops.requestRender({ content: true });
+      requestAppleSectionRender();
     });
   }
 
   function syncAppleNow() {
     view.apple.syncing = true;
-    ops.requestRender({ content: true });
+    requestAppleSectionRender();
     return callCommand("appleCalendar.syncNow", { reason: "manual" }).then((result) => {
       view.apple.syncing = false;
       if (!result || result.status !== "ok") {
-        ops.requestRender({ content: true });
+        requestAppleSectionRender();
         return;
       }
       ops.showToast(t("appleCalendarSyncStarted"));
@@ -298,7 +298,7 @@
     }).catch((err) => {
       view.apple.syncing = false;
       ops.showToast((err && err.message) || t("appleCalendarSyncFailed"), { error: true });
-      ops.requestRender({ content: true });
+      requestAppleSectionRender();
     });
   }
 
@@ -474,7 +474,7 @@
 
     const toggle = () => {
       callUpdate("appleCalendarSyncEnabled", !enabled).then((result) => {
-        if (result && result.status === "ok") ops.requestRender({ content: true });
+        if (result && result.status === "ok") requestAppleSectionRender();
       });
     };
     sw.addEventListener("click", toggle);
@@ -518,7 +518,7 @@
 
     const toggle = () => {
       callUpdate("appleCalendarSyncAllCalendars", !enabled).then((result) => {
-        if (result && result.status === "ok") ops.requestRender({ content: true });
+        if (result && result.status === "ok") requestAppleSectionRender();
       });
     };
     sw.addEventListener("click", toggle);
@@ -619,19 +619,24 @@
     return true;
   }
 
+  function renderAppleSectionInPlace() {
+    const appleSection = document.querySelector(".apple-calendar-section");
+    return replaceSectionRows(appleSection, renderAppleRows());
+  }
+
+  function requestAppleSectionRender() {
+    if (!renderAppleSectionInPlace()) ops.requestRender({ content: true });
+  }
+
+  function isPatchableReminderTabKey(key) {
+    return key === "reminders" || (typeof key === "string" && key.startsWith("appleCalendar"));
+  }
+
   function patchInPlace(changes) {
     const keys = changes ? Object.keys(changes) : [];
     if (!keys.length) return false;
 
-    const canPatch = keys.every((key) => [
-      "reminders",
-      "appleCalendarLastSyncAt",
-      "appleCalendarLastSyncError",
-      "appleCalendarDeletionTombstones",
-      "appleCalendarTargetCalendarId",
-      "appleCalendarTargetCalendarName",
-      "appleCalendarSyncAllCalendars",
-    ].includes(key));
+    const canPatch = keys.every(isPatchableReminderTabKey);
     if (!canPatch) return false;
 
     const listSection = document.querySelector(".reminders-list-section");
