@@ -38,7 +38,7 @@ const {
 } = require("./bubble-policy");
 const { normalizeSessionAliases } = require("./session-alias");
 
-const CURRENT_VERSION = 11;
+const CURRENT_VERSION = 12;
 
 // ── Schema ──
 // Each field has: type, default OR defaultFactory, optional enum/normalize/validate.
@@ -221,6 +221,8 @@ const SCHEMA = {
     defaultFactory: () => ({}),
     normalize: normalizeReminders,
   },
+  healthReminderEnabled: { type: "boolean", default: false },
+  healthReminderLastFiredAt: { type: "number", default: 0, validate: (v) => Number.isFinite(v) && v >= 0 },
   appleCalendarSyncEnabled: { type: "boolean", default: false },
   appleCalendarSyncIntervalMinutes: {
     type: "number",
@@ -507,6 +509,10 @@ function migrate(raw) {
   // v10 -> v11: Apple Calendar deletion tombstones. No data conversion needed.
   if (out.version < 11) {
     out.version = 11;
+  }
+  // v11 -> v12: hourly health reminder settings. No data conversion needed.
+  if (out.version < 12) {
+    out.version = 12;
   }
   if ((typeof out.version === "number" ? out.version : 0) < CURRENT_VERSION) {
     out.version = CURRENT_VERSION;

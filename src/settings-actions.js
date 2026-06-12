@@ -253,6 +253,8 @@ const updateRegistry = {
   disableMiniMode: requireBoolean("disableMiniMode"),
   keepSizeAcrossDisplays: requireBoolean("keepSizeAcrossDisplays"),
   mobilePreviewEnabled: requireBoolean("mobilePreviewEnabled"),
+  healthReminderEnabled: requireBoolean("healthReminderEnabled"),
+  healthReminderLastFiredAt: requireNonNegativeFiniteNumber("healthReminderLastFiredAt"),
   appleCalendarSyncEnabled: requireBoolean("appleCalendarSyncEnabled"),
   appleCalendarSyncIntervalMinutes: requireIntegerInRange("appleCalendarSyncIntervalMinutes", 5, 240),
   appleCalendarSyncWindowDays: requireIntegerInRange("appleCalendarSyncWindowDays", 1, 30),

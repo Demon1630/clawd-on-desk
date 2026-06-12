@@ -490,6 +490,50 @@
     return row;
   }
 
+  function buildHealthReminderRow() {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const text = document.createElement("div");
+    text.className = "row-text";
+    const label = document.createElement("span");
+    label.className = "row-label";
+    label.textContent = t("healthReminderEnabledLabel");
+    const desc = document.createElement("span");
+    desc.className = "row-desc";
+    desc.textContent = t("healthReminderEnabledDesc");
+    text.appendChild(label);
+    text.appendChild(desc);
+    row.appendChild(text);
+
+    const ctrl = document.createElement("div");
+    ctrl.className = "row-control";
+    const sw = document.createElement("div");
+    sw.className = "switch";
+    sw.setAttribute("role", "switch");
+    sw.setAttribute("tabindex", "0");
+    const enabled = state.snapshot && state.snapshot.healthReminderEnabled === true;
+    sw.classList.toggle("on", enabled);
+    sw.setAttribute("aria-checked", enabled ? "true" : "false");
+
+    const toggle = () => {
+      callUpdate("healthReminderEnabled", !enabled).then((result) => {
+        if (result && result.status === "ok") ops.requestRender({ content: true });
+      });
+    };
+    sw.addEventListener("click", toggle);
+    sw.addEventListener("keydown", (ev) => {
+      if (ev.key === " " || ev.key === "Enter") {
+        ev.preventDefault();
+        toggle();
+      }
+    });
+
+    ctrl.appendChild(sw);
+    row.appendChild(ctrl);
+    return row;
+  }
+
   function buildAppleSyncAllCalendarsRow() {
     const row = document.createElement("div");
     row.className = "row";
@@ -629,7 +673,10 @@
   }
 
   function isPatchableReminderTabKey(key) {
-    return key === "reminders" || (typeof key === "string" && key.startsWith("appleCalendar"));
+    return key === "reminders"
+      || key === "healthReminderEnabled"
+      || key === "healthReminderLastFiredAt"
+      || (typeof key === "string" && key.startsWith("appleCalendar"));
   }
 
   function patchInPlace(changes) {
@@ -643,9 +690,11 @@
     const appleSection = document.querySelector(".apple-calendar-section");
     if (!listSection || !appleSection) return false;
 
+    if (keys.every((key) => key === "healthReminderLastFiredAt")) return true;
     if (keys.includes("reminders")) {
       if (!replaceSectionRows(listSection, renderListRows())) return false;
     }
+    if (keys.includes("healthReminderEnabled")) return false;
     if (keys.some((key) => key !== "reminders")) {
       if (!replaceSectionRows(appleSection, renderAppleRows())) return false;
     }
@@ -847,6 +896,7 @@
     parent.appendChild(subtitle);
 
     parent.appendChild(helpers.buildSection(t("remindersSectionNew"), [renderFormCard()]));
+    parent.appendChild(helpers.buildSection(t("healthReminderSectionTitle"), [buildHealthReminderRow()]));
 
     const listSection = helpers.buildSection(t("remindersSectionList"), renderListRows());
     listSection.classList.add("reminders-list-section");

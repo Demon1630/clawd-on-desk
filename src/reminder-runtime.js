@@ -14,7 +14,7 @@ function createReminderRuntime(options = {}) {
 
   let started = false;
   let timer = null;
-  let unsubscribe = null;
+  const unsubscribers = [];
 
   function clearTimer() {
     if (timer) clearTimeout(timer);
@@ -99,12 +99,68 @@ function createReminderRuntime(options = {}) {
     }
   }
 
+  function healthReminderText() {
+    const lang = getLang() || "en";
+    const isZh = lang === "zh" || lang === "zh-TW";
+    return isZh
+      ? { title: "起来走一下，喝点水", note: "活动一下身体，补充水分。" }
+      : { title: "Stretch your legs and drink water", note: "Move around a bit and hydrate." };
+  }
+
+  function healthTargetForHour(ts) {
+    const d = new Date(ts);
+    d.setMinutes(50, 0, 0);
+    return d.getTime();
+  }
+
+  function nextHealthReminderAt(snapshot, ts) {
+    if (!snapshot || snapshot.healthReminderEnabled !== true) return null;
+    const currentHourTarget = healthTargetForHour(ts);
+    if (ts < currentHourTarget) return currentHourTarget;
+    const nextHour = new Date(currentHourTarget);
+    nextHour.setHours(nextHour.getHours() + 1);
+    return nextHour.getTime();
+  }
+
+  function maybeFireHealthReminder(snapshot, ts) {
+    if (!snapshot || snapshot.healthReminderEnabled !== true) return false;
+    const target = healthTargetForHour(ts);
+    if (ts < target || ts >= target + 60_000) return false;
+    const lastFiredAt = Number(snapshot.healthReminderLastFiredAt || 0);
+    if (Number.isFinite(lastFiredAt) && lastFiredAt >= target) return false;
+    const text = healthReminderText();
+    showReminder({
+      id: "health-reminder",
+      title: text.title,
+      note: text.note,
+      dueAt: target,
+    });
+    const result = settingsController.applyUpdate("healthReminderLastFiredAt", ts);
+    if (result && typeof result.then === "function") {
+      result.then((resolved) => {
+        if (!resolved || resolved.status !== "ok") {
+          log(`health reminder: failed to persist fired state: ${resolved && resolved.message}`);
+        }
+      }).catch((err) => {
+        log(`health reminder: failed to persist fired state: ${err && err.message}`);
+      });
+    } else if (!result || result.status !== "ok") {
+      log(`health reminder: failed to persist fired state: ${result && result.message}`);
+    }
+    return true;
+  }
+
   function schedule() {
     if (!started) return;
     clearTimer();
     const snapshot = settingsController.getSnapshot();
     const list = reminderList(snapshot);
     const ts = now();
+    if (maybeFireHealthReminder(snapshot, ts)) {
+      timer = setTimeout(schedule, 0);
+      if (timer && typeof timer.unref === "function") timer.unref();
+      return;
+    }
     const due = list.filter((item) => isDue(item, ts));
     if (due.length > 0) {
       for (const item of due) showReminder(item);
@@ -119,6 +175,10 @@ function createReminderRuntime(options = {}) {
       if (Number.isFinite(item.notifiedAt) && item.notifiedAt >= item.dueAt) continue;
       if (!Number.isFinite(nextDue) || item.dueAt < nextDue) nextDue = item.dueAt;
     }
+    const nextHealthDue = nextHealthReminderAt(snapshot, ts);
+    if (Number.isFinite(nextHealthDue) && (!Number.isFinite(nextDue) || nextHealthDue < nextDue)) {
+      nextDue = nextHealthDue;
+    }
     if (!Number.isFinite(nextDue)) return;
     const delay = Math.max(0, nextDue - ts);
     timer = setTimeout(schedule, delay);
@@ -128,15 +188,19 @@ function createReminderRuntime(options = {}) {
   function start() {
     if (started) return;
     started = true;
-    unsubscribe = settingsController.subscribeKey("reminders", schedule);
+    unsubscribers.push(settingsController.subscribeKey("reminders", schedule));
+    unsubscribers.push(settingsController.subscribeKey("healthReminderEnabled", schedule));
+    unsubscribers.push(settingsController.subscribeKey("healthReminderLastFiredAt", schedule));
     schedule();
   }
 
   function stop() {
     started = false;
     clearTimer();
-    if (typeof unsubscribe === "function") unsubscribe();
-    unsubscribe = null;
+    while (unsubscribers.length > 0) {
+      const unsubscribe = unsubscribers.pop();
+      if (typeof unsubscribe === "function") unsubscribe();
+    }
   }
 
   return {
