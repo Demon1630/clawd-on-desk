@@ -25,6 +25,7 @@ function createPetWanderRuntime(options = {}) {
   let motionTimer = null;
   let nextWanderAt = 0;
   let lastPersistAt = 0;
+  let motionActive = false;
   const unsubscribers = [];
 
   function clearTimer() {
@@ -107,7 +108,10 @@ function createPetWanderRuntime(options = {}) {
 
   function finishMotion(success) {
     clearMotionTimer();
-    try { onMotionEnd(); } catch {}
+    if (motionActive) {
+      motionActive = false;
+      try { onMotionEnd(); } catch {}
+    }
     if (success) maybePersistPosition();
     scheduleAfterRest();
   }
@@ -123,6 +127,7 @@ function createPetWanderRuntime(options = {}) {
 
     const durationMs = Math.max(3500, Math.min(9000, Math.round(distance * 18)));
     const startedAt = now();
+    motionActive = true;
     try { onMotionStart(dx < 0 ? "left" : "right"); } catch {}
 
     const step = () => {
@@ -136,7 +141,10 @@ function createPetWanderRuntime(options = {}) {
         : 1 - Math.pow(-2 * t + 2, 2) / 2;
       const x = Math.round(fromBounds.x + dx * eased);
       const y = Math.round(fromBounds.y + dy * eased);
-      petWindowRuntime.applyPetWindowPosition(x, y);
+      const move = typeof petWindowRuntime.applyPetWindowPositionWithoutResize === "function"
+        ? petWindowRuntime.applyPetWindowPositionWithoutResize
+        : petWindowRuntime.applyPetWindowPosition;
+      move(x, y);
       if (t >= 1) {
         finishMotion(true);
         return;

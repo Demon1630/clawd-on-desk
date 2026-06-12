@@ -169,6 +169,23 @@ function createPetWindowRuntime(options = {}) {
     return applyPetWindowBounds({ ...bounds, x, y });
   }
 
+  function applyPetWindowPositionWithoutResize(x, y) {
+    const win = getRenderWindow();
+    if (!isLiveWindow(win)) return null;
+    const current = win.getBounds();
+    const nextX = Math.round(x);
+    const nextY = Math.round(y + viewportOffsetY);
+    win.setPosition(nextX, nextY);
+    syncHitWin();
+    repositionAnchoredSurfaces();
+    return {
+      x: nextX,
+      y: nextY,
+      width: current.width,
+      height: current.height,
+    };
+  }
+
   function isPetHidden() {
     return petHidden;
   }
@@ -759,6 +776,7 @@ function createPetWindowRuntime(options = {}) {
     getPetWindowBounds,
     applyPetWindowBounds,
     applyPetWindowPosition,
+    applyPetWindowPositionWithoutResize,
     isPetHidden,
     setPetHidden,
     togglePetVisibility,
