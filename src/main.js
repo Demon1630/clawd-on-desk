@@ -2744,6 +2744,13 @@ const settingsEffectRouter = createSettingsEffectRouter({
 settingsEffectRouter.start();
 function showReminderSignOnPet(payload) {
   if (!win || win.isDestroyed()) return false;
+  try {
+    if (_state && typeof _state.setState === "function") {
+      _state.setState("attention");
+    }
+  } catch (err) {
+    console.warn("Clawd reminders: failed to trigger Stop animation:", err && err.message);
+  }
   sendToRenderer("reminder-sign", payload);
   return true;
 }
