@@ -2768,7 +2768,7 @@ petWanderRuntime = createPetWanderRuntime({
   getPetHidden: () => petWindowRuntime.isPetHidden(),
   getNearestWorkArea,
   persistPosition: () => flushRuntimeStateToPrefs(),
-  onMotionStart: (direction) => sendToRenderer("start-drag-reaction", direction),
+  onMotionStart: () => sendToRenderer("start-drag-reaction", "wander"),
   onMotionEnd: () => sendToRenderer("end-drag-reaction"),
   log: (...args) => console.warn("Clawd pet wander:", ...args),
 });

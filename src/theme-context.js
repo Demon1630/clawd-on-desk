@@ -78,6 +78,7 @@ function createThemeContext(theme, options = {}) {
       dragSvgs: theme.reactions && theme.reactions.drag ? {
         left: theme.reactions.drag.fileLeft || null,
         right: theme.reactions.drag.fileRight || null,
+        wander: theme.reactions.drag.fileWander || null,
       } : null,
       idleFollowSvg: theme.states.idle[0],
       eyeTrackingStates: theme.eyeTracking.enabled ? theme.eyeTracking.states : [],

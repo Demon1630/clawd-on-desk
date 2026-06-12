@@ -207,7 +207,8 @@
   ],
   "reactions": {
     "drag": {
-      "file": "clawd-react-drag.svg"
+      "file": "clawd-react-drag.svg",
+      "fileWander": "clawd-wander-drag.svg"
     },
     "clickLeft": {
       "file": "clawd-react-left.svg",
@@ -286,7 +287,7 @@
     "offsetX": -0.45,
     "offsetY": -0.25,
     "fileScales": {
-      "clawd-react-drag.svg": 0.84
+      "clawd-wander-drag.svg": 0.92
     }
   }
 }
