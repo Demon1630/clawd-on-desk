@@ -241,8 +241,13 @@ function applyObjectScaleStyle(el, file, state) {
     el.style.top = "auto";
     el.style.bottom = `calc(${_objectScaleCSS.imgBottom || "5%"} + ${oy + _viewportOffsetY}px)`;
   } else {
-    el.style.width = _objectScaleCSS.width;
-    el.style.height = _objectScaleCSS.height;
+    const scale = (file && _fileScales[file]) || 1.0;
+    el.style.width = scale === 1.0
+      ? _objectScaleCSS.width
+      : `${parseFloat(_objectScaleCSS.width) * scale}%`;
+    el.style.height = scale === 1.0
+      ? _objectScaleCSS.height
+      : `${parseFloat(_objectScaleCSS.height) * scale}%`;
     el.style.left = `calc(${_objectScaleCSS.left} + ${ox}px)`;
     el.style.top = "auto";
     el.style.bottom = `calc(${_objectScaleCSS.objBottom} + ${oy + _viewportOffsetY}px)`;

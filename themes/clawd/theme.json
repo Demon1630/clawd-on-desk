@@ -284,6 +284,9 @@
     "widthRatio": 1.9,
     "heightRatio": 1.3,
     "offsetX": -0.45,
-    "offsetY": -0.25
+    "offsetY": -0.25,
+    "fileScales": {
+      "clawd-react-drag.svg": 0.84
+    }
   }
 }
