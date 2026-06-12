@@ -50,7 +50,7 @@ function renderReminderSign(payload) {
   reminderSignNoteEl.textContent = note;
   reminderSignEl.hidden = false;
   if (reminderSignTimer) clearTimeout(reminderSignTimer);
-  const durationMs = Math.max(3500, Math.min(12000, Number(payload && payload.durationMs) || 7000));
+  const durationMs = Math.max(10000, Math.min(15000, Number(payload && payload.durationMs) || 10000));
   reminderSignTimer = setTimeout(() => {
     reminderSignTimer = null;
     reminderSignEl.hidden = true;

@@ -76,7 +76,7 @@ function createReminderRuntime(options = {}) {
           title,
           note: item.note || "",
           dueAt: item.dueAt,
-          durationMs: 8000,
+          durationMs: 10000,
         });
         if (sent !== false) return;
       } catch (err) {
