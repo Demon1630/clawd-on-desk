@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "name": "Kid Boy",
+  "author": "OpenAI + user reference",
+  "version": "0.1.0",
+  "description": "Baby boy test theme built from generated single-pose concept art.",
+  "viewBox": {
+    "x": 0,
+    "y": 0,
+    "width": 1254,
+    "height": 1484
+  },
+  "layout": {
+    "contentBox": {
+      "x": 190,
+      "y": 120,
+      "width": 860,
+      "height": 1220
+    },
+    "centerX": 627,
+    "baselineY": 1340,
+    "visibleHeightRatio": 0.68,
+    "baselineBottomRatio": 0.06
+  },
+  "states": {
+    "idle": [
+      "kid-idle.svg"
+    ],
+    "yawning": [
+      "kid-yawning.svg"
+    ],
+    "thinking": [
+      "kid-thinking.svg"
+    ],
+    "working": [
+      "kid-working.svg"
+    ],
+    "juggling": [
+      "kid-working.svg"
+    ],
+    "sweeping": {
+      "fallbackTo": "working"
+    },
+    "error": [
+      "kid-error.svg"
+    ],
+    "attention": [
+      "kid-attention.svg"
+    ],
+    "notification": [
+      "kid-notification.svg"
+    ],
+    "carrying": {
+      "fallbackTo": "working"
+    },
+    "sleeping": [
+      "kid-sleeping.svg"
+    ]
+  },
+  "sleepSequence": {
+    "mode": "direct"
+  },
+  "timings": {
+    "mouseIdleTimeout": 20000,
+    "mouseSleepTimeout": 60000
+  },
+  "hitBoxes": {
+    "default": {
+      "x": 220,
+      "y": 170,
+      "w": 760,
+      "h": 1080
+    },
+    "sleeping": {
+      "x": 120,
+      "y": 640,
+      "w": 1000,
+      "h": 430
+    },
+    "wide": {
+      "x": 120,
+      "y": 150,
+      "w": 1020,
+      "h": 1120
+    }
+  },
+  "wideHitboxFiles": [
+    "kid-attention.svg",
+    "kid-notification.svg",
+    "kid-error.svg",
+    "kid-react-drag.svg"
+  ],
+  "sleepingHitboxFiles": [
+    "kid-sleeping.svg"
+  ],
+  "reactions": {
+    "drag": {
+      "file": "kid-react-drag.svg"
+    }
+  },
+  "miniMode": {
+    "supported": false
+  },
+  "objectScale": {
+    "widthRatio": 1.68,
+    "heightRatio": 1.18,
+    "offsetX": -0.34,
+    "offsetY": -0.13
+  }
+}
