@@ -12,6 +12,8 @@ function createPetWanderRuntime(options = {}) {
   const getPetHidden = typeof options.getPetHidden === "function" ? options.getPetHidden : () => false;
   const getNearestWorkArea = typeof options.getNearestWorkArea === "function" ? options.getNearestWorkArea : () => null;
   const persistPosition = typeof options.persistPosition === "function" ? options.persistPosition : () => {};
+  const onMotionStart = typeof options.onMotionStart === "function" ? options.onMotionStart : () => {};
+  const onMotionEnd = typeof options.onMotionEnd === "function" ? options.onMotionEnd : () => {};
   const log = typeof options.log === "function" ? options.log : () => {};
   const now = typeof options.now === "function" ? options.now : Date.now;
 
@@ -90,11 +92,6 @@ function createPetWanderRuntime(options = {}) {
     const maxX = Math.round(workArea.x + workArea.width - bounds.width - margin);
     if (maxX <= minX) return null;
 
-    const floorY = Math.round(workArea.y + workArea.height - bounds.height - margin);
-    const minY = Math.round(workArea.y + margin);
-    const maxY = Math.max(minY, floorY);
-    const anchoredY = Math.max(minY, Math.min(maxY, floorY + randomInt(-18, 8)));
-
     const span = Math.max(80, Math.round(workArea.width * 0.18));
     const currentX = Math.round(bounds.x);
     const targetLeft = Math.max(minX, currentX - randomInt(span, Math.max(span + 1, Math.round(workArea.width * 0.35))));
@@ -104,12 +101,13 @@ function createPetWanderRuntime(options = {}) {
       targetX = targetX < currentX ? minX : maxX;
     }
 
-    const clamped = petWindowRuntime.clampToScreenVisual(targetX, anchoredY, bounds.width, bounds.height);
+    const clamped = petWindowRuntime.clampToScreenVisual(targetX, bounds.y, bounds.width, bounds.height);
     return clamped ? { x: clamped.x, y: clamped.y } : null;
   }
 
   function finishMotion(success) {
     clearMotionTimer();
+    try { onMotionEnd(); } catch {}
     if (success) maybePersistPosition();
     scheduleAfterRest();
   }
@@ -125,6 +123,7 @@ function createPetWanderRuntime(options = {}) {
 
     const durationMs = Math.max(3500, Math.min(9000, Math.round(distance * 18)));
     const startedAt = now();
+    try { onMotionStart(dx < 0 ? "left" : "right"); } catch {}
 
     const step = () => {
       if (!started || !canWander()) {
