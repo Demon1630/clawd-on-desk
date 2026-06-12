@@ -17,6 +17,7 @@
     "allowEdgePinning",
     "disableMiniMode",
     "keepSizeAcrossDisplays",
+    "petWanderEnabled",
     "manageClaudeHooksAutomatically",
     "openAtLogin",
     "autoStartWithClaude",
@@ -115,6 +116,11 @@
         key: "keepSizeAcrossDisplays",
         labelKey: "rowKeepSizeAcrossDisplays",
         descKey: "rowKeepSizeAcrossDisplaysDesc",
+      }),
+      helpers.buildSwitchRow({
+        key: "petWanderEnabled",
+        labelKey: "rowPetWanderEnabled",
+        descKey: "rowPetWanderEnabledDesc",
       }),
     ]));
 

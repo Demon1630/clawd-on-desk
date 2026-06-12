@@ -38,7 +38,7 @@ const {
 } = require("./bubble-policy");
 const { normalizeSessionAliases } = require("./session-alias");
 
-const CURRENT_VERSION = 12;
+const CURRENT_VERSION = 13;
 
 // ── Schema ──
 // Each field has: type, default OR defaultFactory, optional enum/normalize/validate.
@@ -94,6 +94,7 @@ const SCHEMA = {
   // would see prefs report `false` and have it written back to the system.
   openAtLogin: { type: "boolean", default: false },
   openAtLoginHydrated: { type: "boolean", default: false },
+  petWanderEnabled: { type: "boolean", default: false },
   bubbleFollowPet: { type: "boolean", default: false },
   sessionHudEnabled: { type: "boolean", default: true },
   sessionHudShowStateLabels: { type: "boolean", default: true },
@@ -513,6 +514,10 @@ function migrate(raw) {
   // v11 -> v12: hourly health reminder settings. No data conversion needed.
   if (out.version < 12) {
     out.version = 12;
+  }
+  // v12 -> v13: pet desktop wandering toggle. No data conversion needed.
+  if (out.version < 13) {
+    out.version = 13;
   }
   if ((typeof out.version === "number" ? out.version : 0) < CURRENT_VERSION) {
     out.version = CURRENT_VERSION;

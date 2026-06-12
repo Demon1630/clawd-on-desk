@@ -252,6 +252,7 @@ const updateRegistry = {
   allowEdgePinning: requireBoolean("allowEdgePinning"),
   disableMiniMode: requireBoolean("disableMiniMode"),
   keepSizeAcrossDisplays: requireBoolean("keepSizeAcrossDisplays"),
+  petWanderEnabled: requireBoolean("petWanderEnabled"),
   mobilePreviewEnabled: requireBoolean("mobilePreviewEnabled"),
   healthReminderEnabled: requireBoolean("healthReminderEnabled"),
   healthReminderLastFiredAt: requireNonNegativeFiniteNumber("healthReminderLastFiredAt"),

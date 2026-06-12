@@ -50,6 +50,7 @@ const createTopmostRuntime = require("./topmost-runtime");
 const { WIN_TOPMOST_LEVEL } = createTopmostRuntime;
 const createThemeFadeSequencer = require("./theme-fade-sequencer");
 const createThemeRuntime = require("./theme-runtime");
+const { createPetWanderRuntime } = require("./pet-wander-runtime");
 const { createReminderRuntime } = require("./reminder-runtime");
 const { createAppleCalendarAuthStore } = require("./apple-calendar-auth-store");
 const { createAppleCalendarSyncRuntime } = require("./apple-calendar-sync");
@@ -249,6 +250,7 @@ let themeRuntime = null;
 let agentRuntime = null;
 let floatingWindowRuntime = null;
 let codexPetMain = null;
+let petWanderRuntime = null;
 let reminderRuntime = null;
 let appleCalendarSyncRuntime = null;
 let telegramApprovalSidecar = null;
@@ -2754,6 +2756,20 @@ function showReminderSignOnPet(payload) {
   sendToRenderer("reminder-sign", payload);
   return true;
 }
+petWanderRuntime = createPetWanderRuntime({
+  settingsController: _settingsController,
+  petWindowRuntime,
+  getCurrentState: () => _state.getCurrentState(),
+  getMiniMode: () => _mini.getMiniMode(),
+  getMiniTransitioning: () => _mini.getMiniTransitioning(),
+  getDragLocked: () => petWindowRuntime.isDragLocked(),
+  getMenuOpen: () => menuOpen,
+  getMouseOverPet: () => mouseOverPet,
+  getPetHidden: () => petWindowRuntime.isPetHidden(),
+  getNearestWorkArea,
+  persistPosition: () => flushRuntimeStateToPrefs(),
+  log: (...args) => console.warn("Clawd pet wander:", ...args),
+});
 reminderRuntime = createReminderRuntime({
   settingsController: _settingsController,
   Notification,
@@ -3411,6 +3427,9 @@ if (!gotTheLock) {
 
     // Auto-updater: setup event handlers (user triggers check via tray menu)
     setupAutoUpdater();
+    try { if (petWanderRuntime) petWanderRuntime.start(); } catch (err) {
+      console.warn("Clawd: pet wander runtime start failed:", err && err.message);
+    }
     try { if (reminderRuntime) reminderRuntime.start(); } catch (err) {
       console.warn("Clawd: reminder runtime start failed:", err && err.message);
     }
@@ -3427,6 +3446,7 @@ if (!gotTheLock) {
 
   app.on("before-quit", () => {
     isQuitting = true;
+    try { if (petWanderRuntime) petWanderRuntime.stop(); } catch {}
     try { if (reminderRuntime) reminderRuntime.stop(); } catch {}
     try { if (appleCalendarSyncRuntime) appleCalendarSyncRuntime.stop(); } catch {}
     try { stopUpdateScheduler(); } catch {}
