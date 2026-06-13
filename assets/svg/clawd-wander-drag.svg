@@ -34,8 +34,8 @@
       }
 
       @keyframes sway {
-        0%   { transform: rotate(-2deg) translate(-0.5px, 0); }
-        100% { transform: rotate(2deg) translate(0.5px, 0); }
+        0%   { transform: rotate(-1deg) translate(-0.25px, 0); }
+        100% { transform: rotate(1deg) translate(0.25px, 0); }
       }
 
       @keyframes dangle-1 {
@@ -48,12 +48,12 @@
       }
 
       @keyframes flail-l {
-        0%   { transform: rotate(18deg); }
-        100% { transform: rotate(42deg); }
+        0%   { transform: rotate(8deg); }
+        100% { transform: rotate(18deg); }
       }
       @keyframes flail-r {
-        0%   { transform: rotate(-18deg); }
-        100% { transform: rotate(-42deg); }
+        0%   { transform: rotate(-8deg); }
+        100% { transform: rotate(-18deg); }
       }
 
       @keyframes shadow-pulse {

@@ -809,7 +809,9 @@ function cancelReaction() {
 // --- Drag reaction (loops while dragging) ---
 function startDragReaction(direction) {
   if (dndEnabled) return;
-  const dragSvg = (direction && _dragSvgs[direction]) || _dragSvg;
+  const dragSvg = direction === "wander"
+    ? (_dragSvgs.wander || "clawd-wander-drag.svg")
+    : ((direction && _dragSvgs[direction]) || _dragSvg);
   if (!dragSvg) return;
   if (isDragReacting && currentDragSvg === dragSvg) return;
 
