@@ -169,20 +169,26 @@ function createPetWindowRuntime(options = {}) {
     return applyPetWindowBounds({ ...bounds, x, y });
   }
 
-  function applyPetWindowPositionWithoutResize(x, y) {
+  function applyPetWindowPositionWithoutResize(x, y, lockedSize = null) {
     const win = getRenderWindow();
     if (!isLiveWindow(win)) return null;
     const current = win.getBounds();
     const nextX = Math.round(x);
     const nextY = Math.round(y + viewportOffsetY);
-    win.setPosition(nextX, nextY);
+    const width = Math.round(
+      lockedSize && Number.isFinite(lockedSize.width) ? lockedSize.width : current.width
+    );
+    const height = Math.round(
+      lockedSize && Number.isFinite(lockedSize.height) ? lockedSize.height : current.height
+    );
+    win.setBounds({ x: nextX, y: nextY, width, height });
     syncHitWin();
     repositionAnchoredSurfaces();
     return {
       x: nextX,
       y: nextY,
-      width: current.width,
-      height: current.height,
+      width,
+      height,
     };
   }
 

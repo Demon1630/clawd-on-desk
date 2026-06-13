@@ -127,6 +127,7 @@ function createPetWanderRuntime(options = {}) {
 
     const durationMs = Math.max(3500, Math.min(9000, Math.round(distance * 18)));
     const startedAt = now();
+    const lockedSize = { width: fromBounds.width, height: fromBounds.height };
     motionActive = true;
     try { onMotionStart(dx < 0 ? "left" : "right"); } catch {}
 
@@ -144,7 +145,7 @@ function createPetWanderRuntime(options = {}) {
       const move = typeof petWindowRuntime.applyPetWindowPositionWithoutResize === "function"
         ? petWindowRuntime.applyPetWindowPositionWithoutResize
         : petWindowRuntime.applyPetWindowPosition;
-      move(x, y);
+      move(x, y, lockedSize);
       if (t >= 1) {
         finishMotion(true);
         return;
